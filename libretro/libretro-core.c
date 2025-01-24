@@ -4176,7 +4176,7 @@ static void update_variables(void)
       if (!strcmp(var.value, "false"))
       {
          strcat(uae_config, "immediate_blits=false\n");
-         strcat(uae_config, "waiting_blits=false\n");
+         strcat(uae_config, "waiting_blits=disabled\n");
       }
       else if (!strcmp(var.value, "immediate"))
       {
