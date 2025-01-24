@@ -203,6 +203,10 @@ Compatible CAPSIMG libraries for Android can be found at [https://github.com/rsn
 
 Please be aware that there are 32-bits and 64-bits versions of the library. Choose the one corresponding to your RetroArch executable.
 
+Android Tip:
+
+You have to import/install `capsimg.so` as a core.
+
 ### ZIP support
 
 ZIPs are extracted to a temporary directory in `saves`, bypassing the default frontend extraction.

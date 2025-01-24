@@ -73,18 +73,22 @@ static int load_capslib (void)
     /* This could be done more elegantly ;-) */
 
 #ifdef __LIBRETRO__
-    snprintf(CAPSLIB_PATH, RETRO_PATH_MAX, "%s%c%s", retro_system_directory, DIR_SEP_CHR, CAPSLIB_NAME);
+    #ifdef __ANDROID__
+        snprintf(CAPSLIB_PATH, RETRO_PATH_MAX, "%s%c%s", "/data/user/0/com.retroarch/cores", DIR_SEP_CHR, CAPSLIB_NAME);
+    #else
+        snprintf(CAPSLIB_PATH, RETRO_PATH_MAX, "%s%c%s", retro_system_directory, DIR_SEP_CHR, CAPSLIB_NAME);
+    #endif
     if (!path_is_valid(CAPSLIB_PATH))
-        snprintf(CAPSLIB_PATH, RETRO_PATH_MAX, "%s", CAPSLIB_NAME);
+	snprintf(CAPSLIB_PATH, RETRO_PATH_MAX, "%s", CAPSLIB_NAME);
     if (!path_is_valid(CAPSLIB_PATH))
     {
         snprintf(retro_message_msg, sizeof(retro_message_msg), "CAPS library '%s' not found!", CAPSLIB_NAME);
         retro_message = true;
     }
     if ((capslib.handle = uae_dlopen(CAPSLIB_PATH))) {
-#else
+	#else
     if ((capslib.handle = uae_dlopen(CAPSLIB_NAME))) {
-#endif
+	#endif
     write_log (CAPSLIB_NAME " opened\n");
 	capslib.CAPSInit            = uae_dlsym (capslib.handle, "CAPSInit");            if (capslib.CAPSInit == NULL) return 0;
 	capslib.CAPSExit            = uae_dlsym (capslib.handle, "CAPSExit");            if (capslib.CAPSExit == NULL) return 0;
