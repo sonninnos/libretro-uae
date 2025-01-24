@@ -203,9 +203,11 @@ Compatible CAPSIMG libraries for Android can be found at [https://github.com/rsn
 
 Please be aware that there are 32-bits and 64-bits versions of the library. Choose the one corresponding to your RetroArch executable.
 
-Android Tip:
+#### Android
 
-You have to import/install `capsimg.so` as a core.
+Android does not allow loading dynamic libraries from `system` directory, but it can load from the executable directory, which requires root access.
+
+Android does allow loading from the core directory, which means you can and have to import/install `capsimg.so` as a core to use CAPSIMG without root access.
 
 ### ZIP support
 
