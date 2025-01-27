@@ -23,10 +23,6 @@
 #include "memory.h"
 #include "sounddep/sound.h"
 
-#ifndef MAX_FLOPPY_DRIVES
-#define MAX_FLOPPY_DRIVES 4
-#endif
-
 #ifndef MAX_STOP
 #define MAX_STOP 30000
 #endif
@@ -5109,20 +5105,21 @@ bool retro_disk_set_image_index(unsigned index)
       if (index < dc->count && dc->files[index])
       {
          dc->index = index;
-         display_current_image(dc->labels[dc->index], false);
 
          switch (dc->types[dc->index])
          {
             case DC_IMAGE_TYPE_FLOPPY:
-               log_cb(RETRO_LOG_INFO, "Disk (%d) inserted in drive DF0: '%s'\n", dc->index+1, dc->files[dc->index]);
+               log_cb(RETRO_LOG_INFO, "Disk (%d) inserted in drive DF0: '%s'\n", dc->index + 1, dc->files[dc->index]);
                break;
             case DC_IMAGE_TYPE_CD:
-               log_cb(RETRO_LOG_INFO, "CD (%d) inserted in drive CD0: '%s'\n", dc->index+1, dc->files[dc->index]);
+               log_cb(RETRO_LOG_INFO, "CD (%d) inserted in drive CD0: '%s'\n", dc->index + 1, dc->files[dc->index]);
                break;
             default:
+               return true;
                break;
          }
 
+         display_current_image(dc->labels[dc->index], false);
          return true;
       }
    }
@@ -5543,8 +5540,8 @@ static void retro_config_boot_hd(void)
     * therefore use 'BootHD:' as volume name */
    if (dc_get_image_type(full_path) == DC_IMAGE_TYPE_WHDLOAD ||
        dc_get_image_type(full_path) == DC_IMAGE_TYPE_HD ||
-       m3u == DC_IMAGE_TYPE_HD ||
-       m3u == DC_IMAGE_TYPE_WHDLOAD)
+       m3u & (1 << DC_IMAGE_TYPE_HD) ||
+       m3u & (1 << DC_IMAGE_TYPE_WHDLOAD))
       snprintf(volume, sizeof(volume), "%s", label);
 
    snprintf(boothd_size, sizeof(boothd_size), "%dM", 0);
@@ -5781,6 +5778,7 @@ static void retro_config_harddrives(void)
 {
    char *tmp_str = NULL;
    int8_t i      = 0;
+   uint8_t unit  = 0;
 
    if (!dc->count)
       return;
@@ -5789,6 +5787,10 @@ static void retro_config_harddrives(void)
    {
       char tmp_str_name[RETRO_PATH_MAX];
       char tmp_str_path[RETRO_PATH_MAX];
+
+      if (     dc_get_image_type(dc->files[i]) == DC_IMAGE_TYPE_FLOPPY
+            || dc_get_image_type(dc->files[i]) == DC_IMAGE_TYPE_CD)
+         continue;
 
       tmp_str = utf8_to_local_string_alloc(dc->files[i]);
       snprintf(tmp_str_name, sizeof(tmp_str_name), "%s", path_basename(tmp_str));
@@ -5815,10 +5817,10 @@ static void retro_config_harddrives(void)
 
       /* LHAs read-only */
       if (strendswith(dc->files[i], "lha"))
-         retro_config_append("filesystem2=ro,DH%d:%s:\"%s\",0\n", i, tmp_str_name, tmp_str);
+         retro_config_append("filesystem2=ro,DH%d:%s:\"%s\",0\n", unit, tmp_str_name, tmp_str);
       /* Directories writable */
       else if (path_is_directory(dc->files[i]) || strendswith(dc->files[i], "slave") || strendswith(dc->files[i], "info"))
-         retro_config_append("filesystem2=rw,DH%d:%s:\"%s\",0\n", i, tmp_str_name, tmp_str);
+         retro_config_append("filesystem2=rw,DH%d:%s:\"%s\",0\n", unit, tmp_str_name, tmp_str);
       /* Hardfiles */
       else if (dc_get_image_type(dc->files[i]) == DC_IMAGE_TYPE_HD)
       {
@@ -5836,7 +5838,7 @@ static void retro_config_harddrives(void)
          }
 
          if (hdf_rdb)
-            retro_config_append("hardfile2=rw,DH%d:\"%s\",0,0,0,512,0,,uae0\n", i, tmp_str);
+            retro_config_append("hardfile2=rw,DH%d:\"%s\",0,0,0,512,0,,uae0\n", unit, tmp_str);
          else
          {
             /* Guesstimate surfaces */
@@ -5844,11 +5846,12 @@ static void retro_config_harddrives(void)
             if ((fsize(tmp_str) / 1024) >= (1024 * 1024))
                surfaces = 16;
 
-            retro_config_append("hardfile2=rw,DH%d:\"%s\",32,%d,2,512,0,,uae0\n", i, tmp_str, surfaces);
+            retro_config_append("hardfile2=rw,DH%d:\"%s\",32,%d,2,512,0,,uae0\n", unit, tmp_str, surfaces);
          }
       }
 
-      log_cb(RETRO_LOG_INFO, "HD (%d) inserted in drive DH%d: '%s'\n", i+1, i, dc->files[i]);
+      log_cb(RETRO_LOG_INFO, "HD (%d) inserted in drive DH%d: '%s'\n", unit + 1, unit, dc->files[i]);
+      unit++;
 
       if (tmp_str)
          free(tmp_str);
@@ -6475,7 +6478,7 @@ static bool retro_create_config(void)
       }
 
       /* Inspect M3U */
-      int m3u = 0;
+      unsigned m3u = 0;
       if (strendswith(full_path, "m3u"))
          m3u = dc_inspect_m3u(full_path);
 
@@ -6483,10 +6486,10 @@ static bool retro_create_config(void)
       if (dc_get_image_type(full_path) == DC_IMAGE_TYPE_FLOPPY
        || dc_get_image_type(full_path) == DC_IMAGE_TYPE_HD
        || dc_get_image_type(full_path) == DC_IMAGE_TYPE_WHDLOAD
-       || m3u == DC_IMAGE_TYPE_FLOPPY
-       || m3u == DC_IMAGE_TYPE_ARCHIVE
-       || m3u == DC_IMAGE_TYPE_HD
-       || m3u == DC_IMAGE_TYPE_WHDLOAD)
+       || m3u & (1 << DC_IMAGE_TYPE_FLOPPY)
+       || m3u & (1 << DC_IMAGE_TYPE_ARCHIVE)
+       || m3u & (1 << DC_IMAGE_TYPE_HD)
+       || m3u & (1 << DC_IMAGE_TYPE_WHDLOAD))
       {
          /* Check if model is specified in the path on 'Automatic' */
          if (!strcmp(opt_model, "auto"))
@@ -6561,8 +6564,9 @@ static bool retro_create_config(void)
                if (!opt_use_boot_hd &&
                    (dc_get_image_type(full_path) == DC_IMAGE_TYPE_HD ||
                     dc_get_image_type(full_path) == DC_IMAGE_TYPE_WHDLOAD ||
-                    m3u == DC_IMAGE_TYPE_HD ||
-                    m3u == DC_IMAGE_TYPE_WHDLOAD))
+                    m3u & (1 << DC_IMAGE_TYPE_CD) ||
+                    m3u & (1 << DC_IMAGE_TYPE_HD) ||
+                    m3u & (1 << DC_IMAGE_TYPE_WHDLOAD)))
                   retro_config_preset(opt_model_hd);
             }
          }
@@ -6580,8 +6584,8 @@ static bool retro_create_config(void)
          /* Hard drive or WHDLoad image */
          if (dc_get_image_type(full_path) == DC_IMAGE_TYPE_HD
           || dc_get_image_type(full_path) == DC_IMAGE_TYPE_WHDLOAD
-          || m3u == DC_IMAGE_TYPE_HD
-          || m3u == DC_IMAGE_TYPE_WHDLOAD)
+          || m3u == (1 << DC_IMAGE_TYPE_HD)
+          || m3u == (1 << DC_IMAGE_TYPE_WHDLOAD))
          {
             /* M3U playlist */
             if (strendswith(full_path, "m3u"))
@@ -6592,7 +6596,7 @@ static bool retro_create_config(void)
                /* Some debugging */
                log_cb(RETRO_LOG_INFO, "M3U parsed, %d file(s) found\n", dc->count);
                for (unsigned i = 0; i < dc->count; i++)
-                  log_cb(RETRO_LOG_DEBUG, "File %d: %s\n", i+1, dc->files[i]);
+                  log_cb(RETRO_LOG_DEBUG, "File %d: %s\n", i + 1, dc->files[i]);
             }
             /* Single file */
             else
@@ -6975,7 +6979,7 @@ static bool retro_create_config(void)
                /* Some debugging */
                log_cb(RETRO_LOG_INFO, "M3U parsed, %d file(s) found\n", dc->count);
                for (unsigned i = 0; i < dc->count; i++)
-                  log_cb(RETRO_LOG_DEBUG, "File %d: %s\n", i+1, dc->files[i]);
+                  log_cb(RETRO_LOG_DEBUG, "File %d: %s\n", i + 1, dc->files[i]);
             }
             /* Single file */
             else
@@ -7001,31 +7005,40 @@ static bool retro_create_config(void)
                /* Init first disk */
                dc->index = 0;
                dc->eject_state = false;
-               display_current_image(dc->labels[dc->index], true);
-               log_cb(RETRO_LOG_INFO, "Disk (%d) inserted in drive DF0: '%s'\n", dc->index+1, dc->files[dc->index]);
-               tmp_str = utf8_to_local_string_alloc(dc->files[0]);
-               retro_config_append("floppy0=%s\n", tmp_str);
-               free(tmp_str);
-               tmp_str = NULL;
+               if (dc->types[dc->index] == DC_IMAGE_TYPE_FLOPPY)
+               {
+                  log_cb(RETRO_LOG_INFO, "Disk (%d) inserted in drive DF0: '%s'\n", dc->index + 1, dc->files[dc->index]);
+                  tmp_str = utf8_to_local_string_alloc(dc->files[0]);
+                  retro_config_append("floppy0=%s\n", tmp_str);
+                  free(tmp_str);
+                  tmp_str = NULL;
+               }
 
                /* Append rest of the disks to the config if M3U is a MultiDrive-M3U */
                if (strstr(full_path, "(MD)") != NULL || opt_floppy_multidrive)
                {
-                  for (unsigned i = 1; i < dc->count; i++)
+                  uint8_t i;
+                  uint8_t floppy = 1;
+
+                  for (i = 1; i < dc->count; i++)
                   {
-                     if (i < MAX_FLOPPY_DRIVES)
+                     if (floppy < MAX_FLOPPY_DRIVES)
                      {
                         if (strstr(dc->labels[i], M3U_SAVEDISK_LABEL))
                            continue;
 
-                        log_cb(RETRO_LOG_INFO, "Disk (%d) inserted in drive DF%d: '%s'\n", i+1, i, dc->files[i]);
+                        if (dc->types[i] != DC_IMAGE_TYPE_FLOPPY)
+                           continue;
+
+                        log_cb(RETRO_LOG_INFO, "Disk (%d) inserted in drive DF%d: '%s'\n", floppy + 1, floppy, dc->files[i]);
                         tmp_str = utf8_to_local_string_alloc(dc->files[i]);
-                        retro_config_append("floppy%d=%s\n", i, tmp_str);
+                        retro_config_append("floppy%d=%s\n", floppy, tmp_str);
                         free(tmp_str);
                         tmp_str = NULL;
 
                         /* By default only DF0: is enabled, so floppyXtype needs to be set on the extra drives */
-                        retro_config_append("floppy%dtype=%d\n", i, 0); /* 0 = 3.5" DD */
+                        retro_config_append("floppy%dtype=%d\n", floppy, 0); /* 0 = 3.5" DD */
+                        floppy++;
                      }
                      else
                      {
@@ -7034,7 +7047,34 @@ static bool retro_create_config(void)
                      }
                   }
                }
+
+               if (m3u & (1 << DC_IMAGE_TYPE_CD))
+               {
+                  uint8_t i;
+                  uint8_t drive = 0;
+                  /* Attach CD disk */
+                  for (i = 0; i < dc->count && !drive; i++)
+                  {
+                     if (dc->types[i] != DC_IMAGE_TYPE_CD)
+                        continue;
+
+                     log_cb(RETRO_LOG_INFO, "CD (%d) inserted in drive CD0: '%s'\n", drive + 1, dc->files[i]);
+                     retro_config_append("cdimage0=%s,%s\n", dc->files[i], (opt_cd_startup_delayed_insert ? "delay" : "")); /* ","-suffix needed if filename contains "," */
+                     drive++;
+                  }
+
+                  if (drive)
+                     retro_config_append("scsi=true\n");
+               }
             }
+
+            /* Attach hard drive(s) */
+            if (m3u & (1 << DC_IMAGE_TYPE_HD))
+               retro_config_harddrives();
+
+            /* Show current index image */
+            if (dc->count)
+               display_current_image(dc->labels[dc->index], true);
 
             /* Scan for save disk 0, append if exists */
             if (dc->count)
@@ -7050,7 +7090,7 @@ static bool retro_create_config(void)
       }
       /* CD image */
       else if (dc_get_image_type(full_path) == DC_IMAGE_TYPE_CD
-            || m3u == DC_IMAGE_TYPE_CD)
+            || m3u == (1 << DC_IMAGE_TYPE_CD))
       {
          /* Check if model is specified in the path on 'Automatic' */
          if (!strcmp(opt_model, "auto"))
@@ -7105,7 +7145,7 @@ static bool retro_create_config(void)
             /* Some debugging */
             log_cb(RETRO_LOG_INFO, "M3U parsed, %d file(s) found\n", dc->count);
             for (unsigned i = 0; i < dc->count; i++)
-               log_cb(RETRO_LOG_DEBUG, "File %d: %s\n", i+1, dc->files[i]);
+               log_cb(RETRO_LOG_DEBUG, "File %d: %s\n", i + 1, dc->files[i]);
          }
          /* Single file */
          else
@@ -7132,7 +7172,7 @@ static bool retro_create_config(void)
             dc->index = 0;
             dc->eject_state = false;
             display_current_image(dc->labels[dc->index], true);
-            log_cb(RETRO_LOG_INFO, "CD (%d) inserted in drive CD0: '%s'\n", dc->index+1, dc->files[dc->index]);
+            log_cb(RETRO_LOG_INFO, "CD (%d) inserted in drive CD0: '%s'\n", dc->index + 1, dc->files[dc->index]);
             retro_config_append("cdimage0=%s,%s\n", dc->files[0], (opt_cd_startup_delayed_insert ? "delay" : "")); /* ","-suffix needed if filename contains "," */
          }
 
@@ -7252,7 +7292,7 @@ static bool retro_create_config(void)
             dc->index = 0;
             dc->eject_state = false;
             display_current_image(dc->labels[dc->index], true);
-            log_cb(RETRO_LOG_INFO, "Disk (%d) inserted in drive DF0: '%s'\n", dc->index+1, dc->files[dc->index]);
+            log_cb(RETRO_LOG_INFO, "Disk (%d) inserted in drive DF0: '%s'\n", dc->index + 1, dc->files[dc->index]);
          }
 
          /* Verify and write Kickstart */

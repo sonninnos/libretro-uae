@@ -72,7 +72,7 @@ void dc_reset(dc_storage* dc)
    }
 
    /* Clean the struct */
-   for (unsigned i=0; i < dc->count; i++)
+   for (unsigned i = 0; i < dc->count; i++)
    {
       if (dc->files[i])
          free(dc->files[i]);
@@ -105,7 +105,7 @@ dc_storage* dc_create(void)
       dc->eject_state = true;
       dc->replace = false;
       dc->command = NULL;
-      for (int i = 0; i < DC_MAX_SIZE; i++)
+      for (unsigned i = 0; i < DC_MAX_SIZE; i++)
       {
          dc->files[i]  = NULL;
          dc->labels[i] = NULL;
@@ -178,6 +178,7 @@ bool dc_remove_file(dc_storage* dc, int index)
    {
       memmove(dc->files + index, dc->files + index + 1, (dc->count - 1 - index) * sizeof(dc->files[0]));
       memmove(dc->labels + index, dc->labels + index + 1, (dc->count - 1 - index) * sizeof(dc->labels[0]));
+      memmove(dc->types + index, dc->types + index + 1, (dc->count - 1 - index) * sizeof(dc->types[0]));
    }
 
    dc->count--;
@@ -332,18 +333,25 @@ bool dc_replace_file(dc_storage* dc, int index, const char* filename)
          /* Append rest of the disks to the config if M3U is a MultiDrive-M3U */
          if (strstr(full_path_replace, "(MD)") != NULL || opt_floppy_multidrive)
          {
-            for (unsigned i = 1; i < dc->count; i++)
+            int8_t i;
+            uint8_t floppy = 1;
+
+            for (i = 1; i < dc->count; i++)
             {
-               if (i < 4)
+               if (floppy < MAX_FLOPPY_DRIVES)
                {
                   if (strstr(dc->labels[i], M3U_SAVEDISK_LABEL))
                      continue;
 
-                  log_cb(RETRO_LOG_INFO, "Disk (%d) inserted in drive DF%d: '%s'\n", i+1, i, dc->files[i]);
-                  strcpy(changed_prefs.floppyslots[i].df, dc->files[i]);
+                  if (dc->types[i] != DC_IMAGE_TYPE_FLOPPY)
+                     continue;
+
+                  log_cb(RETRO_LOG_INFO, "Disk (%d) inserted in drive DF%d: '%s'\n", floppy + 1, floppy, dc->files[i]);
+                  strcpy(changed_prefs.floppyslots[floppy].df, dc->files[i]);
 
                   /* By default only DF0: is enabled, so floppyXtype needs to be set on the extra drives */
-                  changed_prefs.floppyslots[i].dfxtype = 0; /* 0 = 3.5" DD */
+                  changed_prefs.floppyslots[floppy].dfxtype = 0; /* 0 = 3.5" DD */
+                  floppy++;
                }
                else
                {
@@ -676,23 +684,28 @@ static bool dc_add_m3u_disk(
 
 unsigned dc_inspect_m3u(const char* m3u_file)
 {
+   FILE* fp     = NULL;
    unsigned ret = 0;
-   FILE* fp = NULL;
+   uint8_t type = DC_IMAGE_TYPE_UNKNOWN;
+   char buffer[2048];
 
    /* Try to open the file */
    if ((fp = fopen(m3u_file, "r")) == NULL)
       return 0;
 
-   char buffer[2048];
-   while ((fgets(buffer, sizeof(buffer), fp) != NULL) && !ret)
+   while ((fgets(buffer, sizeof(buffer), fp) != NULL))
    {
       char* string = trimwhitespace(buffer);
       /* Remove label */
       char* token = strtok(string, "|");
+
+      type = dc_get_image_type(string);
+
       /* Ignore comments/tags */
-      ret = !strstartswith(string, COMMENT) ? dc_get_image_type(string) : 0;
-      if (ret == DC_IMAGE_TYPE_UNKNOWN)
-         ret = 0;
+      if (type == DC_IMAGE_TYPE_UNKNOWN || strstartswith(string, COMMENT))
+         continue;
+
+      ret |= (1 << type);
    }
 
    /* Close the file */

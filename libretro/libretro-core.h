@@ -41,6 +41,10 @@ extern void libretro_do_restart(int argc, TCHAR **argv);
 /* File helpers functions */
 #define RETRO_PATH_MAX 512
 
+#ifndef MAX_FLOPPY_DRIVES
+#define MAX_FLOPPY_DRIVES 4
+#endif
+
 #ifdef WIN32
 #define DIR_SEP_STR "\\"
 #define DIR_SEP_CHR '\\'
