@@ -380,6 +380,7 @@ Pre-installed WHDLoad LHA archives can be launched directly without any kind of 
 
 #### Latest changes
 
+- Updated WHDLoad to 19.1 (2024-12-07).
 - Updated WHDLoad to 18.9 (2023-05-04).
 - Downgraded WHDLoad to 18.6 due to a save related bug in 18.7.
 - Updated WHDLoad to the latest one (18.7 2021-10-23).

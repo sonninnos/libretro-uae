@@ -56,7 +56,6 @@ ENDIF
 
 Devs:Monitors/NTSC
 Devs:Monitors/PAL
-RUN >NIL: C:JoyMouse ACCEL
 
 IF EXISTS DH0:load
    Execute DH0:load
