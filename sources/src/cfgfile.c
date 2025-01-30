@@ -39,7 +39,7 @@
 #include "misc.h"
 
 #ifdef __LIBRETRO__
-extern char uae_full_config[32768];
+extern char *retro_get_uae_full_config(void);
 #endif
 
 static int config_newfilesystem;
@@ -3918,19 +3918,17 @@ static int cfgfile_load_2 (struct uae_prefs *p, const TCHAR *filename, bool real
 	}
 #ifdef __LIBRETRO__
     fh = NULL;
+    char full_config[32768];
     char *token;
-    for (token = strtok(uae_full_config, "\n"); token; token = strtok(NULL, "\n")) {
-		strcpy(linea, token);
+    strlcpy(full_config, retro_get_uae_full_config(), sizeof(full_config));
+    for (token = strtok(full_config, "\n"); token; token = strtok(NULL, "\n")) {
+		strncpy(linea, token, sizeof(linea));
 #else
-	write_log ("Opening cfgfile '%s' ", filename);
 	fh = zfile_fopen (filename, _T("r"), ZFD_NORMAL);
 #ifndef	SINGLEFILE
-	if (! fh) {
-		//write_log ("failed\n");
+	if (! fh)
 		return 0;
-	}
 #endif
-	//write_log ("OK\n");
 
 	while (cfg_fgets (linea, sizeof (linea), fh) != 0) {
 #endif /* __LIBRETRO__ */

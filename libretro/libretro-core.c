@@ -190,7 +190,6 @@ bool opt_aspect_ratio_locked = false;
 
 struct zfile *retro_deserialize_file = NULL;
 static size_t save_state_file_size = 0;
-static unsigned save_state_grace = 2;
 
 unsigned int retro_devices[RETRO_DEVICES] = {0};
 extern void display_current_image(const char *image, bool inserted);
@@ -235,6 +234,11 @@ static char uae_config[4096] = {0};
 static char uae_custom_config[2048] = {0};
 static char uae_preset_config[2048] = {0};
 char uae_full_config[UAE_CONFIG_SIZE] = {0};
+
+char *retro_get_uae_full_config(void)
+{
+   return uae_full_config;
+}
 
 /* Audio output buffer */
 static struct {
@@ -5204,12 +5208,6 @@ void retro_init(void)
    struct retro_core_options_update_display_callback update_display_callback = {retro_update_display};
    environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_UPDATE_DISPLAY_CALLBACK, &update_display_callback);
 
-   /* Savestates
-    * > Considered incomplete because runahead cannot
-    *   be enabled until content is full loaded */
-   static uint64_t quirks = RETRO_SERIALIZATION_QUIRK_INCOMPLETE;
-   environ_cb(RETRO_ENVIRONMENT_SET_SERIALIZATION_QUIRKS, &quirks);
-
    /* > Ensure save state de-serialization file
     *   is closed/NULL
     *   (redundant safety check, possibly required
@@ -8384,10 +8382,6 @@ void retro_run(void)
    input_poll_cb();
    retro_poll_event();
 
-   /* Prevent serialize on startup frames */
-   if (save_state_grace > 0)
-      save_state_grace--;
-
    /* Check if a restart is required */
    if (restart_pending)
    {
@@ -8395,10 +8389,9 @@ void retro_run(void)
       libretro_do_restart(sizeof(uae_argv)/sizeof(*uae_argv), uae_argv);
       /* Re-run emulation first pass */
       restart_pending = m68k_go(1, 0);
-      return;
    }
 
-   /* Resume emulation for 1 frame */
+   /* Resume emulation for 1 frame (may_quit, resume) */
    restart_pending = m68k_go(1, 1);
    retro_now += 1000000 / retro_refresh;
 
@@ -8519,6 +8512,11 @@ bool retro_load_game(const struct retro_game_info *info)
 
    /* Run emulation first pass */
    restart_pending = m68k_go(1, 0);
+
+   /* Restart immediately to fix certain save state loading issues.. */
+   uae_restart(0, NULL); /* opengui, cfgfile */
+   restart_pending = m68k_go(1, 1);
+
    /* > We are now ready to enter the run loop */
    libretro_runloop_active = true;
 
@@ -8530,34 +8528,9 @@ bool retro_load_game(const struct retro_game_info *info)
     *   since we use memory based save states */
    savestate_fname[0] = '\0';
 
-   /* > Prevent saving for a few frames to disable
-    *   run-ahead and prevent startup crashing */
-   save_state_grace = 2;
-
-   /* > Get save state size
-    *   Here we use initial size + 5%
-    *   Should be sufficient in all cases
-    * NOTE: It would be better to calculate the
-    * state size based on current config parameters,
-    * but while
-    *   - currprefs.chipmem_size
-    *   - currprefs.bogomem_size
-    *   - currprefs.fastmem_size
-    * account for *most* of the size, there are
-    * simply too many other factors to rely on this
-    * alone (i.e. mem size + 5% is fine in most cases,
-    * but if the user supplies a custom uae config file
-    * then this is not adequate at all). Untangling the
-    * full set of values that are recorded is beyond
-    * my patience... */
-   struct zfile *state_file = save_state("libretro", 0);
-
-   if (state_file)
-   {
-      save_state_file_size  = (size_t)zfile_size(state_file);
-      save_state_file_size += (size_t)(((float)save_state_file_size * 0.05f) + 0.5f);
-      zfile_fclose(state_file);
-   }
+   /* Estimate necessary save state size */
+   save_state_file_size = currprefs.chipmem_size + currprefs.bogomem_size + currprefs.fastmem_size + currprefs.z3fastmem_size;
+   save_state_file_size += (size_t)(((float)save_state_file_size * 0.05f) + 0.5f);
 
    struct retro_memory_descriptor memdesc[] = {
       {RETRO_MEMDESC_SYSTEM_RAM, chipmemory, 0, 0, 0, 0, allocated_chipmem, "CHIP"},
@@ -8625,7 +8598,7 @@ bool retro_serialize(void *data_, size_t size)
    struct zfile *state_file = save_state("libretro", (uae_u64)save_state_file_size);
    bool success = false;
 
-   if (state_file && !save_state_grace)
+   if (state_file)
    {
       uae_s64 state_file_size = zfile_size(state_file);
 
@@ -8645,13 +8618,6 @@ bool retro_serialize(void *data_, size_t size)
 
 bool retro_unserialize(const void *data_, size_t size)
 {
-   /* TODO: When attempting to use runahead, CD32
-    * and WHDLoad content will hang on boot. It seems
-    * we cannot restore a state until the system has
-    * passed some level of initialisation - but the
-    * point at which a restore becomes 'safe' is
-    * unknown (for CD32 content, for example, we have
-    * to wait ~300 frames before runahead can be enabled) */
    bool success = false;
 
    /* Cannot restore state while any 'savestate'
