@@ -3495,7 +3495,7 @@ void finish_drawing_frame (void)
 
 	draw_frame2 ();
 
-#ifndef ___LIBRETRO__
+#ifndef __LIBRETRO__
 	if (currprefs.leds_on_screen) {
 		int slx, sly;
 		statusline_getpos (&slx, &sly, gfxvidinfo.outwidth, gfxvidinfo.outheight);
