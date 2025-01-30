@@ -52,7 +52,7 @@
 #endif
 
 #ifdef __LIBRETRO__
-extern char uae_full_config[32768];
+extern char *retro_get_uae_full_config(void);
 #endif
 
 static int config_newfilesystem;
@@ -7080,8 +7080,10 @@ static int cfgfile_load_2 (struct uae_prefs *p, const TCHAR *filename, bool real
 
 #ifdef __LIBRETRO__
     fh = NULL;
+    char full_config[32768];
     char *token;
-    for (token = strtok(uae_full_config, "\n"); token; token = strtok(NULL, "\n")) {
+    strlcpy(full_config, retro_get_uae_full_config(), sizeof(full_config));
+    for (token = strtok(full_config, "\n"); token; token = strtok(NULL, "\n")) {
 		strncpy(linea, token, sizeof(linea));
 #else
 	fh = zfile_fopen (filename, _T("r"), ZFD_NORMAL);
