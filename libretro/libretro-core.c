@@ -7445,6 +7445,8 @@ static void update_video_center_vertical(void)
    int retroh_crop_normal     = (video_config & PUAE_VIDEO_DOUBLELINE) ? retroh_crop / 2 : retroh_crop;
    int thisframe_y_adjust_new = thisframe_y_adjust_old;
    int thisframe_y_adjust_cur = thisframe_y_adjust;
+   int first_drawn_min        = 150;
+   int last_drawn_max         = 150;
 
    /* Always reset default top border */
    thisframe_y_adjust = minfirstline;
@@ -7454,20 +7456,21 @@ static void update_video_center_vertical(void)
       thisframe_y_adjust_new = thisframe_y_adjust + opt_vertical_offset;
    else if ( retro_thisframe_first_drawn_line       != retro_thisframe_last_drawn_line
          && (retro_thisframe_first_drawn_line > 0   && retro_thisframe_last_drawn_line > 0)
-         && (  (!retro_av_info_is_lace && (retro_thisframe_first_drawn_line < 150 && retro_thisframe_last_drawn_line > 150))
-            || ( retro_av_info_is_lace && (retro_thisframe_first_drawn_line < 150 || retro_thisframe_last_drawn_line > 150)))
+         && (  (!retro_av_info_is_lace && (retro_thisframe_first_drawn_line < first_drawn_min && retro_thisframe_last_drawn_line > last_drawn_max))
+            || ( retro_av_info_is_lace && (retro_thisframe_first_drawn_line < first_drawn_min || retro_thisframe_last_drawn_line > last_drawn_max)))
       )
       thisframe_y_adjust_new = (retro_thisframe_last_drawn_line - retro_thisframe_first_drawn_line - retroh_crop_normal) / 2 + retro_thisframe_first_drawn_line;
    else if (retro_thisframe_first_drawn_line == -1 && retro_thisframe_last_drawn_line == -1 && thisframe_y_adjust_old != 0)
       thisframe_y_adjust_new = thisframe_y_adjust_old;
 
+   /* CD32 boot special */
+   if (     retro_thisframe_last_drawn_line - retro_thisframe_first_drawn_line < 50
+         && retro_thisframe_first_drawn_line - minfirstline < 50)
+      thisframe_y_adjust_new += 50;
+
    /* Sensible limits */
    thisframe_y_adjust_new = (thisframe_y_adjust_new < 0) ? 0 : thisframe_y_adjust_new;
    thisframe_y_adjust_new = (thisframe_y_adjust_new > (minfirstline + 70)) ? (minfirstline + 70) : thisframe_y_adjust_new;
-
-   /* KS 1.3 startup centers off screen for a moment if allowed */
-   if (retro_thisframe_last_drawn_line < 200 && thisframe_y_adjust_new < minfirstline)
-      thisframe_y_adjust_new = thisframe_y_adjust_old;
 
    /* Remember the previous value */
    thisframe_y_adjust_old = thisframe_y_adjust_new;
@@ -7531,6 +7534,10 @@ static void update_video_center_horizontal(void)
       visible_left_border_new = (retro_max_diwstop - retro_min_diwstart - retrow_crop) / 2 + retro_min_diwstart;
    else if (retro_min_diwstart == MAX_STOP && retro_max_diwstop == 0 && visible_left_border != 0)
       visible_left_border_new = visible_left_border;
+
+   /* CD32 boot special */
+   if (retro_max_diwstop < retro_min_diwstart)
+      visible_left_border_new = default_left_border;
 
    /* Sensible limits */
    visible_left_border_new = (visible_left_border_new < 0) ? 0 : visible_left_border_new;
