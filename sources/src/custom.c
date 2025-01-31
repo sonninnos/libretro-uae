@@ -76,6 +76,7 @@ extern bool request_update_av_info;
 extern bool retro_av_info_change_timing;
 extern bool retro_av_info_is_ntsc;
 extern bool retro_av_info_is_lace;
+extern uint8_t video_config_allow_hz_change;
 #endif
 
 /* internal prototypes */
@@ -3053,6 +3054,9 @@ void compute_vsynctime (void)
 		fake_vblank_hz = vblank_hz;
 #ifdef __LIBRETRO__
 	vsynctimebase = 1;
+	syncbase      = 1000;
+	if (video_config_allow_hz_change < 2)
+	   syncadjust    = 1.0;
 #else
 	if (currprefs.turbo_emulation)
 		vsynctimebase = vsynctimebase_orig = 1;

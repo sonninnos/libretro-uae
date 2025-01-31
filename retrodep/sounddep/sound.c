@@ -93,7 +93,7 @@ int init_sound (void)
     sndbufsize = DEFAULT_SOUND_MINB;
     obtainedfreq = DEFAULT_SOUND_FREQ;
     sndbufpt = sndbuffer;
-    sample_handler =  sample16s_handler;
+    sample_handler = sample16s_handler;
     sound_initialized = 1;
 
 #ifdef DRIVESOUND
