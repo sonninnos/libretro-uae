@@ -52,6 +52,7 @@ extern int detected_screen_resolution;
 extern int diwlastword_total;
 extern int diwfirstword_total;
 extern int m68k_go(int may_quit, int resume);
+extern void compute_vsynctime(void);
 
 unsigned int opt_model_options_display = 0;
 unsigned int opt_audio_options_display = 0;
@@ -8016,6 +8017,7 @@ static bool retro_update_av_info(void)
    bool isntsc                 = retro_av_info_is_ntsc;
    bool islace                 = retro_av_info_is_lace;
    bool change_timing          = retro_av_info_change_timing;
+   bool change_timing_init     = retro_av_info_change_timing;
    bool change_geometry        = retro_av_info_change_geometry;
    float hz                    = currprefs.chipset_refreshrate;
 
@@ -8431,6 +8433,10 @@ static bool retro_update_av_info(void)
    }
    else if (change_geometry)
       environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &new_av_info);
+
+   /* Timing changes require new SNDRATE calculation */
+   if (change_timing || (video_config_allow_hz_change > 1 && change_timing_init))
+      compute_vsynctime();
 
    /* Remember aspect ratio for update skip */
    if (change_timing || change_geometry)

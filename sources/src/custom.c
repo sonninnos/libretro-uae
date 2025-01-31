@@ -55,6 +55,7 @@ extern bool request_update_av_info;
 extern bool retro_av_info_change_timing;
 extern bool retro_av_info_is_ntsc;
 extern bool retro_av_info_is_lace;
+extern uint8_t video_config_allow_hz_change;
 #endif
 
 #define BPL_ERASE_TEST 0
@@ -6745,6 +6746,8 @@ void compute_vsynctime(void)
 #ifdef __LIBRETRO__
 	vsynctimebase = 1;
 	syncbase      = 1000;
+	if (video_config_allow_hz_change < 2)
+	   syncadjust    = 1.0;
 #else
 	if (currprefs.turbo_emulation) {
 		if (currprefs.turbo_emulation_limit > 0) {
