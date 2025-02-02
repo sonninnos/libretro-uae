@@ -16631,9 +16631,7 @@ uae_u8 *save_custom_event_delay(size_t *len, uae_u8 *dstptr)
 			} else if (f == bitplane_dma_change) {
 				type = 10;
 			} else {
-#ifndef __LIBRETRO__
 				write_log("unknown event2 handler %p\n", e->handler);
-#endif
 				e->active = false;
 				f(e->data);
 			}
@@ -16645,9 +16643,7 @@ uae_u8 *save_custom_event_delay(size_t *len, uae_u8 *dstptr)
 			save_u32(e->data);
 		}
 	}
-#ifndef __LIBRETRO__
 	write_log("%d pending events saved\n", cnt2);
-#endif
 
 	*len = dst - dstbak;
 	return dstbak;

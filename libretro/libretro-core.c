@@ -8484,10 +8484,12 @@ void retro_run(void)
       restart_pending = 0;
       libretro_do_restart(sizeof(uae_argv)/sizeof(*uae_argv), uae_argv);
       /* Re-run emulation first pass */
+      libretro_runloop_active = false;
       restart_pending = m68k_go(1, 0);
    }
 
    /* Resume emulation for 1 frame (may_quit, resume) */
+   libretro_runloop_active = true;
    restart_pending = m68k_go(1, 1);
    retro_now += 1000000 / retro_refresh;
 
@@ -8610,10 +8612,8 @@ bool retro_load_game(const struct retro_game_info *info)
 
    /* Restart immediately to fix certain save state loading issues.. */
    uae_restart(&currprefs, 0, NULL); /* currprefs, opengui, cfgfile */
-   restart_pending = m68k_go(1, 1);
-
-   /* > We are now ready to enter the run loop */
-   libretro_runloop_active = true;
+   libretro_do_restart(sizeof(uae_argv)/sizeof(*uae_argv), uae_argv);
+   restart_pending = m68k_go(1, 0);
 
    /* Force check for redirected save disks */
    floppy_open_redirect(-1);

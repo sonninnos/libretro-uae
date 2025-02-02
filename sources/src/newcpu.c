@@ -4710,6 +4710,11 @@ static int do_specialties (int cycles)
 	uaecptr pc = m68k_getpc();
 	uae_atomic spcflags = regs.spcflags;
 
+#ifdef __LIBRETRO__
+	if (libretro_frame_end)
+		return 1;
+#endif
+
 	if (spcflags & SPCFLAG_MODE_CHANGE)
 		return 1;
 	
@@ -4883,11 +4888,6 @@ static int do_specialties (int cycles)
 		}
 #endif
 	}
-
-#ifdef __LIBRETRO__
-	if (libretro_frame_end)
-		return 1;
-#endif
 
 	return 0;
 }
@@ -6611,6 +6611,7 @@ void m68k_go (int may_quit)
 #endif
 {
 #ifdef __LIBRETRO__
+loop:
 	if (resume == 0)
 	{
 		hardboot = 1;
@@ -6883,6 +6884,8 @@ void m68k_go (int may_quit)
 			libretro_frame_end = false;
 			return 0;
 		}
+		else
+			goto loop;
 #endif
 	}
 	protect_roms(false);
