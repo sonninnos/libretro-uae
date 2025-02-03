@@ -3822,11 +3822,6 @@ void doint (void)
 
 STATIC_INLINE int do_specialties (int cycles)
 {
-#ifdef __LIBRETRO__
-	if (libretro_frame_end)
-		return 1;
-#endif
-
 		regs.instruction_pc = m68k_getpc ();
 #ifdef ACTION_REPLAY
 #ifdef ACTION_REPLAY_HRTMON
@@ -4000,6 +3995,11 @@ STATIC_INLINE int do_specialties (int cycles)
 
 	if ((regs.spcflags & (SPCFLAG_BRK | SPCFLAG_MODE_CHANGE)))
 		return 1;
+
+#ifdef __LIBRETRO__
+	if (libretro_frame_end)
+		return 1;
+#endif
 
 	return 0;
 }
