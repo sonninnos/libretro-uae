@@ -7365,8 +7365,8 @@ static void update_video_center_vertical(void)
    int retroh_crop_normal     = (video_config & PUAE_VIDEO_DOUBLELINE) ? retroh_crop / 2 : retroh_crop;
    int thisframe_y_adjust_new = thisframe_y_adjust_old;
    int thisframe_y_adjust_cur = thisframe_y_adjust;
-   int first_drawn_min        = 150;
-   int last_drawn_max         = 150;
+   int first_drawn_limit      = 150;
+   int last_drawn_limit       = 150;
 
    /* Always reset default top border */
    thisframe_y_adjust = minfirstline;
@@ -7376,17 +7376,11 @@ static void update_video_center_vertical(void)
       thisframe_y_adjust_new = thisframe_y_adjust + opt_vertical_offset;
    else if ( retro_thisframe_first_drawn_line       != retro_thisframe_last_drawn_line
          && (retro_thisframe_first_drawn_line > 0   && retro_thisframe_last_drawn_line > 0)
-         && (  (!retro_av_info_is_lace && (retro_thisframe_first_drawn_line < first_drawn_min && retro_thisframe_last_drawn_line > last_drawn_max))
-            || ( retro_av_info_is_lace && (retro_thisframe_first_drawn_line < first_drawn_min || retro_thisframe_last_drawn_line > last_drawn_max)))
+         && (retro_thisframe_first_drawn_line < first_drawn_limit || retro_thisframe_last_drawn_line > last_drawn_limit)
       )
       thisframe_y_adjust_new = (retro_thisframe_last_drawn_line - retro_thisframe_first_drawn_line - retroh_crop_normal) / 2 + retro_thisframe_first_drawn_line;
    else if (retro_thisframe_first_drawn_line == -1 && retro_thisframe_last_drawn_line == -1 && thisframe_y_adjust_old != 0)
       thisframe_y_adjust_new = thisframe_y_adjust_old;
-
-   /* CD32 boot special */
-   if (     retro_thisframe_last_drawn_line - retro_thisframe_first_drawn_line < 50
-         && retro_thisframe_first_drawn_line - minfirstline < 50)
-      thisframe_y_adjust_new += 50;
 
    /* Sensible limits */
    thisframe_y_adjust_new = (thisframe_y_adjust_new < 0) ? 0 : thisframe_y_adjust_new;
@@ -7668,14 +7662,16 @@ static void update_audiovideo(void)
          (retro_thisframe_first_drawn_line == -1 && retro_thisframe_last_drawn_line == -1))
       )
    {
-      int min_height = 10;
+      int min_height = 4;
+      int retro_thisframe_height = MAX(retro_thisframe_last_drawn_line - retro_thisframe_first_drawn_line + 1, 200);
       int retro_thisframe_first_drawn_line_delta = abs(retro_thisframe_first_drawn_line_old - retro_thisframe_first_drawn_line);
       int retro_thisframe_last_drawn_line_delta  = abs(retro_thisframe_last_drawn_line_old - retro_thisframe_last_drawn_line);
 
 #if 0
-      printf("thisframe first:%3d old:%3d start:%3d delta:%3d last:%3d old:%3d start:%3d delta:%3d\n",
+      printf("thisframe first:%3d old:%3d start:%3d delta:%3d last:%3d old:%3d start:%3d delta:%3d - h:%3d\n",
             retro_thisframe_first_drawn_line, retro_thisframe_first_drawn_line_old, retro_thisframe_first_drawn_line_start, retro_thisframe_first_drawn_line_delta,
-            retro_thisframe_last_drawn_line, retro_thisframe_last_drawn_line_old, retro_thisframe_last_drawn_line_start, retro_thisframe_last_drawn_line_delta);
+            retro_thisframe_last_drawn_line, retro_thisframe_last_drawn_line_old, retro_thisframe_last_drawn_line_start, retro_thisframe_last_drawn_line_delta,
+            retro_thisframe_height);
 #endif
 
       /* For some odd reason KS2+ Kickstarts start with bogus last_drawn_line,
@@ -7731,6 +7727,15 @@ static void update_audiovideo(void)
          if (!crop_delay && !retro_av_info_is_lace)
             request_update_av_info = true;
 
+         /* Immediate centering if big enough jump */
+         if ((retro_thisframe_first_drawn_line_delta > 15)
+          || (retro_thisframe_last_drawn_line_delta  > 15 && retro_thisframe_last_drawn_line_delta < 115))
+            request_update_av_info = true;
+
+         /* Immediate centering if height remains the same or grows big enough */
+         if (retro_thisframe_height == retroh_crop || (!retro_thisframe_counter && retro_thisframe_height - retroh_crop > 15))
+            request_update_av_info = true;
+
          /* Hasten the result with big enough difference in last line (last line for CD32 no disc) */
          if (retro_thisframe_last_drawn_line_delta > 47 && retro_thisframe_last_drawn_line_delta < 189)
             retro_thisframe_counter++;
@@ -7743,6 +7748,10 @@ static void update_audiovideo(void)
             retro_thisframe_counter = 0;
             request_update_av_info  = false;
          }
+
+         /* Clear counter when immediate */
+         if (request_update_av_info)
+            retro_thisframe_counter = 0;
 
          retro_thisframe_first_drawn_line_old = retro_thisframe_first_drawn_line;
          retro_thisframe_last_drawn_line_old  = retro_thisframe_last_drawn_line;
