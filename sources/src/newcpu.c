@@ -4710,11 +4710,6 @@ static int do_specialties (int cycles)
 	uaecptr pc = m68k_getpc();
 	uae_atomic spcflags = regs.spcflags;
 
-#ifdef __LIBRETRO__
-	if (libretro_frame_end)
-		return 1;
-#endif
-
 	if (spcflags & SPCFLAG_MODE_CHANGE)
 		return 1;
 	
@@ -4888,6 +4883,11 @@ static int do_specialties (int cycles)
 		}
 #endif
 	}
+
+#ifdef __LIBRETRO__
+	if (libretro_frame_end)
+		return 1;
+#endif
 
 	return 0;
 }
