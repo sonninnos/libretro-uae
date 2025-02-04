@@ -8528,11 +8528,6 @@ bool retro_load_game(const struct retro_game_info *info)
    /* Run emulation first pass */
    restart_pending = m68k_go(1, 0);
 
-   /* Restart immediately to fix certain save state loading issues.. */
-   uae_restart(0, NULL); /* opengui, cfgfile */
-   libretro_do_restart(sizeof(uae_argv)/sizeof(*uae_argv), uae_argv);
-   restart_pending = m68k_go(1, 0);
-
    /* Force check for redirected save disks */
    floppy_open_redirect(-1);
 
@@ -8543,7 +8538,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
    /* Estimate necessary save state size */
    save_state_file_size = currprefs.chipmem_size + currprefs.bogomem_size + currprefs.fastmem_size + currprefs.z3fastmem_size;
-   save_state_file_size += (size_t)(((float)save_state_file_size * 0.05f) + 0.5f);
+   save_state_file_size += 128 * 1000;
 
    struct retro_memory_descriptor memdesc[] = {
       {RETRO_MEMDESC_SYSTEM_RAM, chipmemory, 0, 0, 0, 0, allocated_chipmem, "CHIP"},
