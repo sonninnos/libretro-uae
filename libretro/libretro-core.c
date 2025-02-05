@@ -7349,7 +7349,7 @@ static void retro_reset_hard(void)
    locked_video_horizontal = false;
    update_variables();
    retro_create_config();
-   uae_restart(0, NULL); /* opengui, cfgfile */
+   uae_reset(1, 0); /* hardreset, keyboardreset */
 }
 
 static void retro_reset_soft(void)
