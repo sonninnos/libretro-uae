@@ -7519,7 +7519,7 @@ static void update_video_center_horizontal(void)
    if (locked_video_horizontal)
       ; /* no-op */
    else if (!opt_horizontal_offset_auto)
-      visible_left_border_new = visible_left_border + opt_horizontal_offset;
+      visible_left_border_new = visible_left_border + (opt_horizontal_offset * width_multiplier);
    else if (retro_min_diwstart != retro_max_diwstop
          && retro_min_diwstart > 0
          && retro_max_diwstop  > 0
