@@ -26,6 +26,11 @@
 #define MAX_STOP 30000
 #endif
 
+#define BEAMCON0_HARDDIS    0x4000
+#define BEAMCON0_CSCBEN     0x0400
+#define BEAMCON0_VARVSYEN   0x0200
+#define BEAMCON0_HSYTRUE    0x0001
+
 #ifdef USE_LIBRETRO_VFS
 #undef utf8_to_local_string_alloc
 #define utf8_to_local_string_alloc strdup
@@ -7555,17 +7560,39 @@ static void update_audiovideo(void)
    {
       int current_resolution   = detected_screen_resolution;
       bool request_init_custom = false;
+      static uint8_t hsytrue_count = 0;
+
 #if 0
       printf("BPLCON0: %x, %d, %d-%d, %d-%d\n", bplcon0, current_resolution, diwfirstword_total, diwlastword_total, retro_min_diwstart, retro_max_diwstop);
 #endif
       if (opt_video_resolution_auto == RESOLUTION_AUTO_SUPERHIRES)
          opt_video_resolution_auto = RESOLUTION_AUTO_HIRES;
 
-      /* Super Skidmarks force to SuperHires */
-      if (current_resolution == RES_HIRES && bplcon0 == 0xC201
-            && ((diwfirstword_total == 210 && diwlastword_total == 786) || (diwfirstword_total == 420 && diwlastword_total == 1572)))
+      /* Super Skidmarks force SuperHires */
+      if (     current_resolution == RES_HIRES
+            && bplcon0 == 0xC201
+            && ((diwfirstword_total == 210 && diwlastword_total == 786) || (diwfirstword_total == 210 * 2 && diwlastword_total == 786 * 2))
+         )
          current_resolution = RES_SUPERHIRES;
-      /* Lores force to Hires in 'auto' */
+      /* Super Stardust prevent Lores */
+      else if (opt_video_resolution_auto == RESOLUTION_AUTO_LORES
+            && current_resolution == RES_LORES
+            && (diwlastword_total == 392 || diwlastword_total == 393 || diwlastword_total == 401 || diwlastword_total == 424 || diwlastword_total == 784 || diwlastword_total == 786 || diwlastword_total == 802 || diwlastword_total == 1860)
+            && (retro_min_diwstart == 65  || retro_min_diwstart == 65 * 2 || retro_min_diwstart == 72  || retro_min_diwstart == 72 * 2  || retro_min_diwstart == 73  || retro_min_diwstart == 73 * 2)
+            && (retro_max_diwstop  == 392 || retro_max_diwstop == 392 * 2 || retro_max_diwstop  == 393 || retro_max_diwstop  == 393 * 2 || retro_max_diwstop  == 401 || retro_max_diwstop  == 401 * 2 || retro_max_diwstop == 424 || retro_max_diwstop == 424 * 2)
+         )
+      {
+         if (hsytrue_count)
+            hsytrue_count--;
+         if (bplcon0 & BEAMCON0_HSYTRUE)
+         {
+            current_resolution = RES_HIRES;
+            hsytrue_count = 2;
+         }
+         else if (!(bplcon0 & BEAMCON0_HSYTRUE) && hsytrue_count)
+            current_resolution = -1;
+      }
+      /* Lores force Hires in 'auto' */
       else if (opt_video_resolution_auto == RESOLUTION_AUTO_HIRES && current_resolution == 0)
          current_resolution = RES_HIRES;
 
@@ -7573,12 +7600,12 @@ static void update_audiovideo(void)
       if (     opt_video_resolution_auto == RESOLUTION_AUTO_LORES
             && changed_prefs.gfx_resolution == RES_HIRES
             && current_resolution == RES_LORES
-            && bplcon0 == (0x4000 | 0x0200)
+            && bplcon0 == (BEAMCON0_HARDDIS | BEAMCON0_VARVSYEN)
          )
          current_resolution = -1;
 
       /* Ignore always */
-      if (!bplcon0 || bplcon0 & 0x0400)
+      if (bplcon0 & BEAMCON0_CSCBEN)
          current_resolution = -1;
 
       switch (current_resolution)
@@ -8386,6 +8413,8 @@ static bool retro_update_av_info(void)
 
 void retro_run(void)
 {
+   static uint8_t old_frame = true;
+
    /* Core options */
    bool updated = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
@@ -8431,11 +8460,15 @@ void retro_run(void)
       request_reset_drawing = false;
       config_changed = 1;
       reset_drawing();
+
+      if (request_init_custom_timer > 1)
+         old_frame++;
    }
 
    /* Dynamic resolution changing requires a frame breather after reset_drawing() */
    if (request_init_custom_timer > 0)
    {
+      old_frame++;
       request_init_custom_timer--;
       if (request_init_custom_timer == 0)
          init_custom();
@@ -8467,9 +8500,11 @@ void retro_run(void)
    if ((!retro_statusbar && opt_statusbar & STATUSBAR_MESSAGES && statusbar_message_timer) || retro_statusbar)
       print_statusbar();
 
-upload:
-   video_cb(retro_bmp + retro_bmp_offset, retrow_crop, retroh_crop, retrow << (pix_bytes >> 1));
+   video_cb((old_frame) ? NULL : retro_bmp + retro_bmp_offset, retrow_crop, retroh_crop, retrow << (pix_bytes >> 1));
    upload_output_audio_buffer();
+
+   if (old_frame)
+      old_frame--;
 
    if (request_reset_soft)
       retro_reset_soft();
