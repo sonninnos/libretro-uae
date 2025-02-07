@@ -4913,7 +4913,6 @@ void m68k_go (int may_quit)
 #endif
 {
 #ifdef __LIBRETRO__
-loop:
 	if (resume == 0)
 	{
 		hardboot = 1;
@@ -5119,8 +5118,6 @@ loop:
 			libretro_frame_end = false;
 			return 0;
 		}
-		else
-			goto loop;
 #endif
 	}
 #ifdef NATMEM_OFFSET
